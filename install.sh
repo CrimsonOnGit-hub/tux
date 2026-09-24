@@ -42,9 +42,10 @@ else
 fi
 
 chmod +x "$INSTALL_DIR/tux"
+ln -sf "$INSTALL_DIR/tux" "$INSTALL_DIR/Tux" 2>/dev/null || cp "$INSTALL_DIR/tux" "$INSTALL_DIR/Tux"
 
-echo -e "\033[1;32m[+] Tux successfully installed to $INSTALL_DIR/tux\033[0m"
+echo -e "\033[1;32m[+] Tux successfully installed to $INSTALL_DIR/tux (and $INSTALL_DIR/Tux)\033[0m"
 echo -e "\033[1;36mTry running:\033[0m"
-echo -e "  tux list"
+echo -e "  tux list    (or Tux list)"
 echo -e "  tux info fastfetch"
 echo -e "  sudo tux install fastfetch"

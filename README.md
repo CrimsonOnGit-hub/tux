@@ -16,7 +16,15 @@ A fast, lightweight, and colored package manager built for Linux, WSL, and Debia
 
 ## Installation (Linux / WSL)
 
-The `install.sh` script automatically checks for Python 3, ensures `pip` and `pyinstaller` are installed, compiles `tux.py` into a standalone binary via PyInstaller, and links it to `/usr/local/bin/tux` and `/usr/local/bin/Tux`.
+### One-Line Install via APT (Recommended)
+Download and install the official `.deb` package directly with APT in a single command:
+
+```bash
+curl -fsSL https://github.com/CrimsonOnGit-hub/tux/releases/download/v1.0.0/tux_1.0.0_all.deb -o tux.deb && sudo apt install -y ./tux.deb && rm tux.deb
+```
+
+### Build from Source via Installer
+Alternatively, you can clone the repository and run `install.sh`:
 
 ```bash
 git clone https://github.com/CrimsonOnGit-hub/tux.git

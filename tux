@@ -9,7 +9,7 @@ import re
 import subprocess
 import time
 
-REGISTRY_URL = "https://raw.githubusercontent.com/CrimsonOnGit-hub/tux_repository/main/info.json"
+REGISTRY_URL = "https://raw.githubusercontent.com/CrimsonOnGit-hub/tuxrepository/main/info.json"
 DATA_DIR = "/var/lib/tux"
 LOCK_FILE = f"{DATA_DIR}/lock.json"
 DOWNLOAD_CACHE = "/tmp"
@@ -55,7 +55,7 @@ def fetch_registry(force_refresh=False):
         with urllib.request.urlopen(req) as response:
             return json.loads(response.read().decode())
     except Exception as e:
-        print(f"[-] Connection failed to tux_repository: {e}")
+        print(f"[-] Connection failed to tuxrepository: {e}")
         sys.exit(1)
 
 def parse_and_color_box(raw_text):
@@ -135,7 +135,7 @@ def show_package_info(package_name):
     registry_data = fetch_registry()
     packages_db = registry_data.get("packages", {})
     if package_name not in packages_db:
-        print(f"[-] Error: Package '{package_name}' not found in the tux_repository catalog.")
+        print(f"[-] Error: Package '{package_name}' not found in the tuxrepository catalog.")
         return
     pkg_data = packages_db[package_name]
     version = pkg_data.get("version", "0.0.0")
@@ -171,7 +171,7 @@ def refresh_repository():
     print("[+] Tux is hitting remote registries directly to sync latest catalog configurations...")
     registry_data = fetch_registry(force_refresh=True)
     packages_db = registry_data.get("packages", {})
-    print(f"[+] Sync successful! Discovered {len(packages_db)} packages from tux_repository manifest.")
+    print(f"[+] Sync successful! Discovered {len(packages_db)} packages from tuxrepository manifest.")
 
 def get_arch_url_key():
     machine = platform.machine().lower()
@@ -185,7 +185,7 @@ def install_package(package_name):
     registry_data = fetch_registry()
     packages_db = registry_data.get("packages", {})
     if package_name not in packages_db:
-        print(f"[-] Error: '{package_name}' not found in tux_repository database.")
+        print(f"[-] Error: '{package_name}' not found in tuxrepository database.")
         return
     pkg_data = packages_db[package_name]
     version = pkg_data["version"]

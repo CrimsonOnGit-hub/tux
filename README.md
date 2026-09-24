@@ -1,6 +1,6 @@
 # Tux Universal Package Manager
 
-A fast, lightweight, and colored package manager built for Linux, WSL, and Debian-based systems. **Tux** pulls directly from remote repositories like `tux_repository`, resolves device architecture (x86_64, arm64, i386), downloads payloads, and installs packages seamlessly.
+A fast, lightweight, and colored package manager built for Linux, WSL, and Debian-based systems. **Tux** pulls directly from remote repositories like `tuxrepository`, resolves device architecture (x86_64, arm64, i386), downloads payloads, and installs packages seamlessly.
 
 ---
 
@@ -69,8 +69,8 @@ Tux interfaces with repositories through an `info.json` manifest:
   "packages": {
     "fastfetch": {
       "version": "2.30.1",
-      "url_amd64": "https://raw.githubusercontent.com/CrimsonOnGit-hub/tux_repository/main/fastfetchamd.deb",
-      "url_arm64": "https://raw.githubusercontent.com/CrimsonOnGit-hub/tux_repository/main/fastfetcharm.deb",
+      "url_amd64": "https://raw.githubusercontent.com/CrimsonOnGit-hub/tuxrepository/main/fastfetchamd.deb",
+      "url_arm64": "https://raw.githubusercontent.com/CrimsonOnGit-hub/tuxrepository/main/fastfetcharm.deb",
       "desc": "System info tool",
       "tags": "Made for WSL"
     }

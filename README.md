@@ -14,18 +14,21 @@ A fast, lightweight, and colored package manager built for Linux, WSL, and Debia
 
 ---
 
-## Installation
+## Installation (Linux / WSL)
 
-### Quick Install (curl)
-```bash
-curl -fsSL https://raw.githubusercontent.com/CrimsonOnGit-hub/tux/main/install.sh | sudo bash
-```
+The `install.sh` script automatically checks for Python 3, ensures `pip` and `pyinstaller` are installed, compiles `tux.py` into a standalone binary via PyInstaller, and links it to `/usr/local/bin/tux` and `/usr/local/bin/Tux`.
 
-### Manual Install
 ```bash
 git clone https://github.com/CrimsonOnGit-hub/tux.git
 cd tux
 sudo ./install.sh
+```
+
+Once installed, you can execute Tux from any directory simply with:
+```bash
+tux list
+# or
+Tux list
 ```
 
 ---

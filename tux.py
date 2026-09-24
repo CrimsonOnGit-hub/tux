@@ -239,7 +239,10 @@ def install_package(package_name):
             subprocess.run([target_path], check=True)
 
         if os.path.exists(target_path) and not ext in [".sh", ".bin"]:
-            os.remove(target_path)
+            try:
+                os.remove(target_path)
+            except Exception:
+                pass
         lock_data["installed"][package_name] = {"version": version, "files": file_list, "type": ext}
         with open(LOCK_FILE, "w") as f:
             json.dump(lock_data, f, indent=4)

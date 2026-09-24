@@ -33,6 +33,25 @@ Tux list
 
 ---
 
+## Building .deb Package for APT
+
+To build a standalone `.deb` package installable directly via `apt`:
+
+```bash
+chmod +x build_deb.sh
+./build_deb.sh
+```
+
+This generates `dist/tux_1.0.0_all.deb`. You or other users can then install Tux using APT:
+
+```bash
+sudo apt install ./dist/tux_1.0.0_all.deb
+```
+
+APT will automatically verify package dependencies, install `/usr/local/bin/tux`, initialize `/var/lib/tux`, and create the `Tux` alias automatically!
+
+---
+
 ## Usage & Commands
 
 | Command | Description |

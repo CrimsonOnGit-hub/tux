@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+import os
+import sys
+import json
+import urllib.request
+import tarfile
+import platform
+import re
+import subprocess
+import time
+
+REGISTRY_URL = "https://raw.githubusercontent.com/CrimsonOnGit-hub/tux_repository/main/info.json"
+DATA_DIR = "/var/lib/tux"
+LOCK_FILE = f"{DATA_DIR}/lock.json"
+DOWNLOAD_CACHE = "/tmp"
+
+BG_COLORS = {
+    "darkblue": "\033[37;48;2;63;81;181m",
+    "lightblue": "\033[37;48;2;0;135;189m",
+    "green": "\033[37;48;2;0;168;107m",
+    "teal": "\033[37;48;2;0;128;128m",
+    "c51a4a": "\033[37;48;2;197;26;74m",
+    "red": "\033[37;48;2;255;0;0m",
+    "#ff0000": "\033[37;48;2;255;0;0m",
+    "reset": "\033[0m"
+}
+
+TEXT_COLORS = {
+    "amd64": "\033[38;2;0;90;200m",
+    "arm64": "\033[38;2;0;168;107m",
+    "rpi": "\033[38;2;197;26;74m",
+    "i386": "\033[38;2;255;0;0m",
+    "reset": "\033[0m"
+}
+
+def verify_root():
+    if os.getuid() != 0:
+        print("[-] Error: Tux demands root privileges! Use 'sudo tux ...'")
+        sys.exit(1)
+
+def init_environment():
+    verify_root()
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR, exist_ok=True)
+    if not os.path.exists(LOCK_FILE):
+        with open(LOCK_FILE, "w") as f:
+            json.dump({"installed": {}}, f, indent=4)
+
+def fetch_registry(force_refresh=False):
+    url = REGISTRY_URL
+    if force_refresh:
+        url = f"{REGISTRY_URL}?t={int(time.time())}"
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Tux-Package-Manager'})
+        with urllib.request.urlopen(req) as response:
+            return json.loads(response.read().decode())
+    except Exception as e:
+        print(f"[-] Connection failed to tux_repository: {e}")
+        sys.exit(1)
+
+def parse_and_color_box(raw_text):
+    text_lower = raw_text.lower()
+    if "supports" in text_lower or ("," in text_lower and "only" not in text_lower) or " and " in text_lower:
+        white_bg = "\033[30;47m" 
+        processed = raw_text
+        processed = re.sub(r'(amd64)', TEXT_COLORS['amd64'] + r'\1' + white_bg, processed, flags=re.IGNORECASE)
+        processed = re.sub(r'(arm64)', TEXT_COLORS['arm64'] + r'\1' + white_bg, processed, flags=re.IGNORECASE)
+        processed = re.sub(r'(raspberry pi|rpi)', TEXT_COLORS['rpi'] + r'\1' + white_bg, processed, flags=re.IGNORECASE)
+        processed = re.sub(r'(i386)', TEXT_COLORS['i386'] + r'\1' + white_bg, processed, flags=re.IGNORECASE)
+        return f"{white_bg} {processed} {BG_COLORS['reset']}"
+    
+    match = re.search(r'\[color=([\w#\/]+)\s+(.*?)\]', raw_text, re.IGNORECASE)
+    if match:
+        color_key = match.group(1).lower()
+        content = match.group(2)
+        if "/" in color_key: color_key = color_key.split("/")[0]
+        bg_code = BG_COLORS.get(color_key, BG_COLORS['reset'])
+        return f"{bg_code} {content} {BG_COLORS['reset']}"
+    return f" {raw_text} "
+
+def parse_tags(tag_data):
+    if not tag_data: return ""
+    tags = [tag_data] if isinstance(tag_data, str) else tag_data
+    rendered_tags = []
+    for tag in tags:
+        tag_lower = tag.lower()
+        if "wsl" in tag_lower:
+            bg = "\033[37;48;2;0;120;215m"
+        elif "mac" in tag_lower or "apple" in tag_lower:
+            bg = "\033[37;48;2;142;142;147m"
+        elif "raspberry" in tag_lower or "rpi" in tag_lower:
+            bg = "\033[37;48;2;197;26;74m"
+        else:
+            bg = "\033[37;48;2;85;85;85m"
+        rendered_tags.append(f"{bg} {tag} \033[0m")
+    return " ".join(rendered_tags)
+
+def get_compatibility_string(pkg_data, desc=""):
+    active_archs = []
+    if "url_amd64" in pkg_data: active_archs.append("AMD64")
+    if "url_arm64" in pkg_data: active_archs.append("Arm64")
+    if "url_i386" in pkg_data: active_archs.append("i386")
+    
+    if len(active_archs) == 0:
+        return f"[color=Darkblue {desc}]" if desc else "Universal"
+    elif len(active_archs) == 1:
+        arch = active_archs[0]
+        if arch == "AMD64": return "[color=Darkblue AMD64 Only]"
+        elif arch == "Arm64": return "[Color=Green ARM64 Only.]"
+        elif arch == "i386": return "[color=#ff0000 i386 only.]"
+    else:
+        if len(active_archs) == 2:
+            return f"Supports {active_archs[0]} and {active_archs[1]}"
+        else:
+            return "Supports " + ", ".join(active_archs[:-1]) + ", and " + active_archs[-1]
+
+def list_packages():
+    registry_data = fetch_registry()
+    packages_db = registry_data.get("packages", {})
+    print("\n               Tux Universal Package Manager")
+    print(f"    Found: {len(packages_db)} packages")
+    print("    Name | Version | Compatibility | Tags")
+    print("    ---------------------------------------------------------")
+    for pkg_name, pkg_data in packages_db.items():
+        version = pkg_data.get("version", "0.0.0")
+        desc = pkg_data.get("desc", "")
+        tag_data = pkg_data.get("tags", "")
+        compat_str = get_compatibility_string(pkg_data, desc)
+        compat_box = parse_and_color_box(compat_str)
+        tag_box = parse_tags(tag_data)
+        print(f"    {pkg_name} | {version} | {compat_box} | {tag_box}")
+    print()
+
+def show_package_info(package_name):
+    registry_data = fetch_registry()
+    packages_db = registry_data.get("packages", {})
+    if package_name not in packages_db:
+        print(f"[-] Error: Package '{package_name}' not found in the tux_repository catalog.")
+        return
+    pkg_data = packages_db[package_name]
+    version = pkg_data.get("version", "0.0.0")
+    desc = pkg_data.get("desc", "No description provided.")
+    tag_data = pkg_data.get("tags", "")
+    
+    installed_status = "\033[31mNot Installed\033[0m"
+    if os.path.exists(LOCK_FILE):
+        try:
+            with open(LOCK_FILE, "r") as f:
+                lock_data = json.load(f)
+                if package_name in lock_data.get("installed", {}):
+                    inst_ver = lock_data["installed"][package_name].get("version", "")
+                    installed_status = f"\033[32mInstalled (v{inst_ver})\033[0m"
+        except Exception:
+            pass
+
+    compat_str = get_compatibility_string(pkg_data, desc)
+    compat_box = parse_and_color_box(compat_str)
+    tag_box = parse_tags(tag_data) if tag_data else "None"
+
+    print(f"\n\033[1;36m📦 Package Info: {package_name}\033[0m")
+    print(f"    ---------------------------------------------------------")
+    print(f"    \033[1mName:\033[0m          {package_name}")
+    print(f"    \033[1mVersion:\033[0m       {version}")
+    print(f"    \033[1mStatus:\033[0m        {installed_status}")
+    print(f"    \033[1mDescription:\033[0m   {desc}")
+    print(f"    \033[1mCompatibility:\033[0m {compat_box}")
+    print(f"    \033[1mTags:\033[0m          {tag_box}")
+    print()
+
+def refresh_repository():
+    print("[+] Tux is hitting remote registries directly to sync latest catalog configurations...")
+    registry_data = fetch_registry(force_refresh=True)
+    packages_db = registry_data.get("packages", {})
+    print(f"[+] Sync successful! Discovered {len(packages_db)} packages from tux_repository manifest.")
+
+def get_arch_url_key():
+    machine = platform.machine().lower()
+    if machine in ["x86_64", "amd64"]: return "url_amd64"
+    elif machine in ["aarch64", "arm64"]: return "url_arm64"
+    elif machine in ["i386", "i686"]: return "url_i386"
+    return None
+
+def install_package(package_name):
+    init_environment()
+    registry_data = fetch_registry()
+    packages_db = registry_data.get("packages", {})
+    if package_name not in packages_db:
+        print(f"[-] Error: '{package_name}' not found in tux_repository database.")
+        return
+    pkg_data = packages_db[package_name]
+    version = pkg_data["version"]
+    url_key = get_arch_url_key()
+    if not url_key or url_key not in pkg_data:
+        print(f"[-] Error: '{package_name}' does not provide a variant for architecture ({platform.machine()}).")
+        return
+    download_url = pkg_data[url_key]
+    with open(LOCK_FILE, "r") as f:
+        lock_data = json.load(f)
+    if package_name in lock_data.get("installed", {}):
+        if lock_data["installed"][package_name].get("version") == version:
+            print(f"[*] {package_name} ({version}) is already up to date.")
+            return
+
+    filename = download_url.split("/")[-1]
+    ext = "".join(os.path.splitext(filename)[1:]).lower()
+    print(f"[+] Tux is fetching universal archive from remote repository...")
+    target_path = os.path.join(DOWNLOAD_CACHE, f"{package_name}_{version}{ext}")
+    try:
+        req = urllib.request.Request(download_url, headers={'User-Agent': 'Tux-Package-Manager'})
+        with urllib.request.urlopen(req) as response, open(target_path, 'wb') as out_file:
+            out_file.write(response.read())
+        file_list = [target_path]
+        if ext in [".tar.gz", ".pkg", ".tgz"]:
+            print(f"[+] Extracting raw package directory contents to system root...")
+            with tarfile.open(target_path, "r:gz") as tar_ref:
+                file_list = tar_ref.getnames()
+                tar_ref.extractall(path="/")
+        elif ext == ".deb":
+            print(f"[+] Routing payload execution to local dpkg architecture subsystem...")
+            subprocess.run(["dpkg", "-i", target_path], check=True)
+        elif ext in [".sh", ".bin"]:
+            print(f"[+] Elevating permissions and launching script installer sequence...")
+            os.chmod(target_path, 0o755)
+            subprocess.run([target_path], check=True)
+        else:
+            print(f"[-] Warning: Unrecognized file type '{ext}'. Treating as flat executable install...")
+            os.chmod(target_path, 0o755)
+            subprocess.run([target_path], check=True)
+
+        if os.path.exists(target_path) and not ext in [".sh", ".bin"]:
+            os.remove(target_path)
+        lock_data["installed"][package_name] = {"version": version, "files": file_list, "type": ext}
+        with open(LOCK_FILE, "w") as f:
+            json.dump(lock_data, f, indent=4)
+        print(f"[+] Successfully installed '{package_name}' across the system framework!")
+    except Exception as e:
+        print(f"[-] Installation failed: {e}")
+        if os.path.exists(target_path): 
+            try:
+                os.remove(target_path)
+            except Exception:
+                pass
+
+def remove_package(package_name):
+    init_environment()
+    with open(LOCK_FILE, "r") as f:
+        lock_data = json.load(f)
+    if package_name not in lock_data.get("installed", {}):
+        print(f"[-] Error: '{package_name}' is not currently managed by Tux.")
+        return
+    print(f"[-] Tux is removing universal package '{package_name}'...")
+    pkg_data = lock_data["installed"][package_name]
+    pkg_type = pkg_data.get("type", "")
+    if pkg_type == ".deb":
+        try:
+            subprocess.run(["dpkg", "-r", package_name], check=True)
+        except Exception as e:
+            print(f"[-] Error removing deb package via dpkg: {e}")
+    else:
+        for relative_path in pkg_data.get("files", []):
+            target_path = os.path.join("/", relative_path)
+            if os.path.exists(target_path) and not os.path.isdir(target_path):
+                try:
+                    os.remove(target_path)
+                except Exception:
+                    pass
+    del lock_data["installed"][package_name]
+    with open(LOCK_FILE, "w") as f:
+        json.dump(lock_data, f, indent=4)
+    print(f"[+] Cleanly purged '{package_name}' from the distribution database.")
+
+def print_help():
+    print("\033[1;36m🐧 Tux Universal Package Manager\033[0m")
+    print("Just like APT, built for Linux and WSL.\n")
+    print("\033[1mUsage:\033[0m")
+    print("  tux list                  List all available packages in the repository")
+    print("  tux info <package>        Show detailed package information")
+    print("  tux refresh               Sync with latest repository package catalog")
+    print("  tux update                Alias for refresh (sync package catalog)")
+    print("  sudo tux install <pkg>    Install a package (deb, tarball, or installer script)")
+    print("  sudo tux remove <pkg>     Uninstall a managed package")
+    print("  tux help                  Display this help screen\n")
+
+def main():
+    if len(sys.argv) < 2:
+        print_help()
+        sys.exit(1)
+    command = sys.argv[1].lower()
+    if command in ["list", "ls"]:
+        list_packages()
+    elif command in ["refresh", "update"]:
+        refresh_repository()
+    elif command in ["info", "show"]:
+        if len(sys.argv) < 3:
+            print("[-] Error: Provide a package name. Usage: tux info <package>")
+            sys.exit(1)
+        show_package_info(sys.argv[2])
+    elif command in ["install", "i", "add"]:
+        if len(sys.argv) < 3:
+            print("[-] Error: Provide a package name. Usage: sudo tux install <package>")
+            sys.exit(1)
+        install_package(sys.argv[2])
+    elif command in ["remove", "uninstall", "purge", "rm"]:
+        if len(sys.argv) < 3:
+            print("[-] Error: Provide a package name. Usage: sudo tux remove <package>")
+            sys.exit(1)
+        remove_package(sys.argv[2])
+    elif command in ["help", "--help", "-h"]:
+        print_help()
+    else:
+        print(f"[-] Unknown command '{sys.argv[1]}'. Type 'tux help' for usage.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
